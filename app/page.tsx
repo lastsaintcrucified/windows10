@@ -1,103 +1,224 @@
-import Image from "next/image";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+"use client";
+
+import type React from "react";
+
+import { useState, useRef, useEffect } from "react";
+import Desktop from "@/components/desktop";
+import Taskbar from "@/components/taskbar";
+import StartMenu from "@/components/start-menu";
+import WindowManager from "@/components/window-manager";
+import ContextMenu from "@/components/context-menu";
+
+export interface WindowState {
+	id: string;
+	title: string;
+	component: string;
+	isMinimized: boolean;
+	isMaximized: boolean;
+	position: { x: number; y: number };
+	size: { width: number; height: number };
+	zIndex: number;
+}
+
+export interface ContextMenuState {
+	isVisible: boolean;
+	position: { x: number; y: number };
+}
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+	const [windows, setWindows] = useState<WindowState[]>([]);
+	const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
+	const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+		isVisible: false,
+		position: { x: 0, y: 0 },
+	});
+	const [activeWindowId, setActiveWindowId] = useState<string | null>(null);
+	const [currentTime, setCurrentTime] = useState(new Date());
+	const desktopRef = useRef<HTMLDivElement>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+	const [searchQuery, setSearchQuery] = useState("");
+	const [searchResults, setSearchResults] = useState<any[]>([]);
+	const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+	useEffect(() => {
+		const timer = setInterval(() => {
+			setCurrentTime(new Date());
+		}, 1000);
+		return () => clearInterval(timer);
+	}, []);
+
+	const openWindow = (component: string, title: string) => {
+		const id = `${component}-${Date.now()}`;
+		const newWindow: WindowState = {
+			id,
+			title,
+			component,
+			isMinimized: false,
+			isMaximized: false,
+			position: { x: 100 + windows.length * 30, y: 100 + windows.length * 30 },
+			size: { width: 800, height: 600 },
+			zIndex: 1000 + windows.length,
+		};
+		setWindows((prev) => [...prev, newWindow]);
+		setActiveWindowId(id);
+		setIsStartMenuOpen(false);
+	};
+
+	const closeWindow = (id: string) => {
+		setWindows((prev) => prev.filter((w) => w.id !== id));
+		if (activeWindowId === id) {
+			setActiveWindowId(null);
+		}
+	};
+
+	const minimizeWindow = (id: string) => {
+		setWindows((prev) =>
+			prev.map((w) => (w.id === id ? { ...w, isMinimized: true } : w))
+		);
+	};
+
+	const maximizeWindow = (id: string) => {
+		setWindows((prev) =>
+			prev.map((w) =>
+				w.id === id
+					? {
+							...w,
+							isMaximized: !w.isMaximized,
+							position: w.isMaximized ? w.position : { x: 0, y: 0 },
+							size: w.isMaximized
+								? w.size
+								: { width: window.innerWidth, height: window.innerHeight - 48 },
+					  }
+					: w
+			)
+		);
+	};
+
+	const restoreWindow = (id: string) => {
+		setWindows((prev) =>
+			prev.map((w) => (w.id === id ? { ...w, isMinimized: false } : w))
+		);
+		setActiveWindowId(id);
+	};
+
+	const updateWindow = (id: string, updates: Partial<WindowState>) => {
+		setWindows((prev) =>
+			prev.map((w) => (w.id === id ? { ...w, ...updates } : w))
+		);
+	};
+
+	const bringToFront = (id: string) => {
+		const maxZ = Math.max(...windows.map((w) => w.zIndex));
+		setWindows((prev) =>
+			prev.map((w) => (w.id === id ? { ...w, zIndex: maxZ + 1 } : w))
+		);
+		setActiveWindowId(id);
+	};
+
+	const handleSearch = (query: string) => {
+		setSearchQuery(query);
+		if (query.trim()) {
+			// Search through apps and mock files
+			const apps = [
+				{ name: "Calculator", type: "app", component: "calculator" },
+				{ name: "Notepad", type: "app", component: "notepad" },
+				{ name: "File Explorer", type: "app", component: "file-explorer" },
+				{ name: "Settings", type: "app", component: "settings" },
+			];
+
+			const mockFiles = [
+				{ name: "Documents", type: "folder" },
+				{ name: "Downloads", type: "folder" },
+				{ name: "Pictures", type: "folder" },
+				{ name: "example.txt", type: "file" },
+				{ name: "document.pdf", type: "file" },
+			];
+
+			const results = [...apps, ...mockFiles].filter((item) =>
+				item.name.toLowerCase().includes(query.toLowerCase())
+			);
+			setSearchResults(results);
+			setIsSearchOpen(true);
+		} else {
+			setSearchResults([]);
+			setIsSearchOpen(false);
+		}
+	};
+
+	const handleSearchResultClick = (result: any) => {
+		if (result.type === "app") {
+			openWindow(result.component, result.name);
+		} else if (
+			result.name === "Documents" ||
+			result.name === "Downloads" ||
+			result.name === "Pictures"
+		) {
+			openWindow("file-explorer", "File Explorer");
+		}
+		setIsSearchOpen(false);
+		setSearchQuery("");
+	};
+
+	const handleDesktopClick = () => {
+		setIsStartMenuOpen(false);
+		setContextMenu({ isVisible: false, position: { x: 0, y: 0 } });
+		setIsSearchOpen(false);
+	};
+
+	const handleDesktopRightClick = (e: React.MouseEvent) => {
+		e.preventDefault();
+		setContextMenu({
+			isVisible: true,
+			position: { x: e.clientX, y: e.clientY },
+		});
+	};
+
+	return (
+		<div className='h-screen w-screen overflow-hidden relative bg-[url(/wnd.png)] bg-cover bg-center'>
+			<Desktop
+				ref={desktopRef}
+				onClick={handleDesktopClick}
+				onContextMenu={handleDesktopRightClick}
+				onOpenApp={openWindow}
+			/>
+
+			<WindowManager
+				windows={windows}
+				activeWindowId={activeWindowId}
+				onClose={closeWindow}
+				onMinimize={minimizeWindow}
+				onMaximize={maximizeWindow}
+				onUpdate={updateWindow}
+				onBringToFront={bringToFront}
+			/>
+
+			<StartMenu
+				isOpen={isStartMenuOpen}
+				onClose={() => setIsStartMenuOpen(false)}
+				onOpenApp={openWindow}
+			/>
+
+			<ContextMenu
+				isVisible={contextMenu.isVisible}
+				position={contextMenu.position}
+				onClose={() =>
+					setContextMenu({ isVisible: false, position: { x: 0, y: 0 } })
+				}
+			/>
+
+			<Taskbar
+				windows={windows}
+				onStartClick={() => setIsStartMenuOpen(!isStartMenuOpen)}
+				onWindowClick={restoreWindow}
+				currentTime={currentTime}
+				isStartMenuOpen={isStartMenuOpen}
+				searchQuery={searchQuery}
+				searchResults={searchResults}
+				isSearchOpen={isSearchOpen}
+				onSearch={handleSearch}
+				onSearchResultClick={handleSearchResultClick}
+			/>
+		</div>
+	);
 }
